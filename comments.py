@@ -41,7 +41,6 @@ def getPageComments(soup) :
     reples = soup.find('div', {'class' : 'score_result'}).find_all('li')
     comments = []             
     for reple in reples :    
-        pdb.set_trace()
         # reple Text 
         repleText = reple.find('div', {'class' : 'score_reple'}).find_all('span')
         # avoid ico_viewer
