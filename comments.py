@@ -1,11 +1,18 @@
-import requests, time, pdb
+import requests, time, progressbar, random
 from bs4 import BeautifulSoup
 
 base_URL = f"https://movie.naver.com/movie/bi/mi/pointWriteFormList.nhn?"
 
-def getComments(movie_code, limit = None, sleep = 0.05) :
+def getComments(movie_code, limitPage = None, tSleep = 0.05, header_change = False, headerChangeProb = 0.1) :
+    listHeaders = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.106 Safari/537.36',
+                   'Mozilla/5.0 (X11; Ubuntu; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2919.83 Safari/537.36',
+                   'Mozilla/5.0 (Windows NT 10.0; WOW64; rv:77.0) Gecko/20100101 Firefox/77.0',
+                   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.102 Safari/537.36 Edge/18.19582',
+                   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.102 Safari/537.36 Edge/18.19577')
+    headers = {'user-agent' : random.sample(listHeaders,1)[0]}
+    
     # get soup 
-    URL = requests.get(base_URL + f"code={movie_code}")
+    URL  = requests.get(base_URL + f"code={movie_code}", headers = headers)
     soup = BeautifulSoup(URL.text, "html.parser")
     
     # check no score
@@ -14,17 +21,26 @@ def getComments(movie_code, limit = None, sleep = 0.05) :
     
     # last page_no
     last_page = getLastPage(soup)
-    if limit != None :
-        last_page = min(last_page, limit)
+    if limitPage != None :
+        last_page = min(last_page, limitPage)
+
+    # progress bar define
+    bar = progressbar.ProgressBar(maxval = last_page + 1, widgets=[' [', progressbar.Timer(), '] ', progressbar.Bar(), ' (', progressbar.ETA(), ') ',]).start()
 
     comments = []
     for page_no in range(1,last_page + 1) :
-        print(f"scarping page {page_no}")        
- 
-        URL = requests.get(base_URL + f"code={movie_code}" + f"&page={page_no}")
+        # change header 
+        randHeaderChg = random.random()
+        if (header_change == True) and (randHeaderChg < headerChangeProb) :
+            headers = {'user-agent' : random.sample(listHeaders,1)[0]}
+    
+        URL = requests.get(base_URL + f"code={movie_code}" + f"&page={page_no}", headers = headers)
         soup = BeautifulSoup(URL.text, "html.parser")
 
-        comments += getPageComments(soup)
+        comments += getPageComments(soup, tSleep)
+        bar.update(page_no)
+    bar.finish()
+
     return comments
 
 def isNoScore(soup) :                                                                             
@@ -37,7 +53,7 @@ def getLastPage(soup) :
 
     return last_page_no
 
-def getPageComments(soup) :
+def getPageComments(soup, tSleep) :
     reples = soup.find('div', {'class' : 'score_result'}).find_all('li')
     comments = []             
     for reple in reples :    
@@ -52,11 +68,11 @@ def getPageComments(soup) :
         # reple Score
         repleScore = float(reple.find('div', {'class' : 'star_score'}).text)
         
-        # reple date
-        repleDate = re
         comments.append({
             'text'  : repleText,
             'score' : repleScore
         })
-    return comments
 
+        # sleep
+        time.sleep(tSleep)
+    return comments
