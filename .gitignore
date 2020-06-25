@@ -3,4 +3,4 @@ test.py
 /wordcloud_result
 /font
 /__pycache__
-.log
+*.log

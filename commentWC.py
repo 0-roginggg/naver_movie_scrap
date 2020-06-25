@@ -8,11 +8,14 @@ def wcComment(comments, file_path = 'wordcould_resut.png', numWord = 50,
               max_font_size = None,
               width = 400, 
               height = 200, 
-              scale = 1) :
+              scale = 1,
+              exceptionWords = None) :
 
-    nouns = tokenizeComments(comments)
-    trimmedNouns = trimNouns(nouns)
-    nounsFreqDict  = sortNouns(trimmedNouns, numWord, decreasing = True)
+    corpus = tokenizeComments(comments)       
+    corpus = trimNouns(corpus)         
+    corpus = removeWords(corpus, exceptionWords)
+    
+    wordsFreqDict  = sortNouns(corpus, numWord, decreasing = True)
 
     wc = wordcloud.WordCloud(background_color = wcBackround_color, 
                              font_path = font_path, 
@@ -21,7 +24,7 @@ def wcComment(comments, file_path = 'wordcould_resut.png', numWord = 50,
                              scale = scale, 
                              width = width, 
                              height = height)
-    gen = wc.generate_from_frequencies(nounsFreqDict)
+    gen = wc.generate_from_frequencies(wordsFreqDict)
 
     matplotlib.pyplot.figure()
     matplotlib.pyplot.imshow(gen, interpolation = 'bilinear')
@@ -67,3 +70,13 @@ def sortNouns(nouns, numWord, decreasing = False) :
 
     return nounsFreqDict
 
+def removeWords(words,exceptionWords) :
+    if exceptionWords == None :
+        return words
+
+    result_words = []
+    for word in words :
+        if word not in exceptionWords :
+            result_words.append(word)
+
+    return result_words
