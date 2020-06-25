@@ -1,2 +1,6 @@
 test.py
 /movie_comments
+/wordcloud_result
+/font
+/__pycache__
+.log
