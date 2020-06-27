@@ -1,48 +1,8 @@
-import requests, time, progressbar, random
+import requests, pdb, re
 from bs4 import BeautifulSoup
+from Error import *
 
-base_URL = f"https://movie.naver.com/movie/bi/mi/pointWriteFormList.nhn?"
-
-def getComments(movie_code, limitPage = None, tSleep = 0.05, header_change = False, headerChangeProb = 0.1) :
-    listHeaders = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.106 Safari/537.36',
-                   'Mozilla/5.0 (X11; Ubuntu; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2919.83 Safari/537.36',
-                   'Mozilla/5.0 (Windows NT 10.0; WOW64; rv:77.0) Gecko/20100101 Firefox/77.0',
-                   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.102 Safari/537.36 Edge/18.19582',
-                   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.102 Safari/537.36 Edge/18.19577')
-    headers = {'user-agent' : random.sample(listHeaders,1)[0]}
-    
-    # get soup 
-    URL  = requests.get(base_URL + f"code={movie_code}", headers = headers)
-    soup = BeautifulSoup(URL.text, "html.parser")
-    
-    # check no score
-    if isNoScore(soup) :
-        return []
-    
-    # last page_no
-    last_page = getLastPage(soup)
-    if limitPage != None :
-        last_page = min(last_page, limitPage)
-
-    # progress bar define
-    bar = progressbar.ProgressBar(maxval = last_page + 1, widgets=[' [', progressbar.Timer(), '] ', progressbar.Bar(), ' (', progressbar.ETA(), ') ',]).start()
-
-    comments = []
-    for page_no in range(1,last_page + 1) :
-        # change header 
-        randHeaderChg = random.random()
-        if (header_change == True) and (randHeaderChg < headerChangeProb) :
-            headers = {'user-agent' : random.sample(listHeaders,1)[0]}
-    
-        URL = requests.get(base_URL + f"code={movie_code}" + f"&page={page_no}", headers = headers)
-        soup = BeautifulSoup(URL.text, "html.parser")
-
-        comments += getPageComments(soup, tSleep)
-        bar.update(page_no)
-    bar.finish()
-
-    return comments
-
+# util
 def isNoScore(soup) :                                                                             
     is_noScore = soup.find("div", {"class" : "no_score_info"}) != None
     return is_noScore
@@ -50,29 +10,55 @@ def isNoScore(soup) :
 def getLastPage(soup) :                         
     last_reple_no = int(soup.find("strong").find("em").text.replace(',', ''))
     last_page_no = (last_reple_no // 10) + 1
-
     return last_page_no
 
-def getPageComments(soup, tSleep) :
+def getSoup(URL, headers = None) : 
+    web_request = requests.get(URL, headers = headers)
+    if web_request.status_code == 200 :
+        soup = BeautifulSoup(web_request.text, "html.parser")
+        return soup
+    else :
+        raise ResponseError("Response Error")
+    # add 403 forbidden 
+
+# comment
+def getPageComments(soup) :
     reples = soup.find('div', {'class' : 'score_result'}).find_all('li')
     comments = []             
-    for reple in reples :    
-        # reple Text 
-        repleText = reple.find('div', {'class' : 'score_reple'}).find_all('span')
-        # avoid ico_viewer
-        if repleText[0].text == "관람객" :    
-            repleText = repleText[1].text.strip()
-        else :
-            repleText = repleText[0].text.strip()
-        
-        # reple Score
-        repleScore = float(reple.find('div', {'class' : 'star_score'}).text)
-        
-        comments.append({
-            'text'  : repleText,
-            'score' : repleScore
-        })
+    for reple in reples :   
+        reple_score = getRepleScore(reple)              # score 
+        reple_text  = getRepleText(reple)               # Text 
+        reple_date  = getRepleDate(reple)               # Date
+        reple_like, reple_dislike = getNumLike(reple)   # like & dislike
 
-        # sleep
-        time.sleep(tSleep)
+        comments.append({
+            'score'     : reple_score,
+            'text'      : reple_text,
+            'date'      : reple_date,
+            'like'      : reple_like,
+            'dislike'   : reple_dislike
+        })
     return comments
+
+def getRepleText(reple) :
+    reple_text = reple.find('div', {'class' : 'score_reple'}).find_all('span')
+    if reple_text[0].text == "관람객" :    
+        reple_text = reple_text[1].text.strip()
+    else :
+        reple_text = reple_text[0].text.strip()
+    return reple_text
+
+def getRepleScore(reple) :
+    reple_score = float(reple.find('div', {'class' : 'star_score'}).text)
+    return reple_score
+
+def getRepleDate(reple) :
+    date_text = reple.find('dt').text
+    date_text = re.search('[0-9]+.[0-9]+.[0-9]+ [0-9]+:[0-9]+', date_text).group()
+    return date_text
+
+def getNumLike(reple) :
+    num_like    = reple.find_all('strong')[0].text
+    num_dislike = reple.find_all('strong')[1].text
+    return num_like, num_dislike
+
