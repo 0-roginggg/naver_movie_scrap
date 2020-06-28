@@ -2,6 +2,6 @@ test.py
 /movie_comments
 /wordcloud_result
 /font
-__pycache__/
+__pycache__
 *.log
 *.temp
